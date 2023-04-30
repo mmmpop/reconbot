@@ -67,9 +67,10 @@ WebServer server(80);
 WiFiClient wifiClient;
 MqttClient mqttClient(wifiClient);
 
-const char ssid[] = "mp_iphone";
-const char pass[] = "bonjour!"; 
-const char broker[] = "172.20.10.6";
+// const char ssid[] = "mp_iphone";
+// const char pass[] = "bonjour!"; 
+// const char broker[] = "172.20.10.6"; 
+const char broker[] = "192.168.1.25";
 
 int        port     = 1883;
 const char subscribe_topic[]  = "feeds/rover/ui";

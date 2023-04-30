@@ -1,6 +1,7 @@
 import React from "react"
 import mqtt from 'mqtt';
 import useWASD from "use-wasd";
+import axios from 'axios';
 import SimpleKeyboard from 'react-simple-keyboard';
 import 'react-simple-keyboard/build/css/index.css';
 import './App.css';
@@ -147,7 +148,8 @@ function App() {
   }, [keyboard]);
 
   const cameraPreviewEl = React.useRef(null);
-  const [capturing, setCapturing] = React.useState(false);
+  const cameraSnapshotEl = React.useRef(null);
+  const [snapshotTime, setSnapshotTime] = React.useState(null);
   const beginCapture = React.useCallback(
     async () => {
       if (!cameraPreviewEl.current) {
@@ -164,7 +166,7 @@ function App() {
     () => {
       const canvas = document.createElement('canvas');
       canvas.width = 800;
-      canvas.height = 400;
+      canvas.height = 600;
   
       const ctx = canvas.getContext('2d');
       if (!ctx) {
@@ -173,42 +175,63 @@ function App() {
 
       let image = new Image()
       image.crossOrigin = "anonymous"
-      image.src = 'http://172.20.10.12/mjpeg/1'
+      image.src = 'http://localhost:3000/video'
       setTimeout(() => {
         ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL()
           console.log(dataUrl)
-          // document.getElementById('frame').src = dataUrl;
+          cameraSnapshotEl.current.src = dataUrl;
+          setSnapshotTime(new Date())
       }, 500)
     },
     []
   );
 
-  // React.useEffect(() => {
-  //   const canvas = document.createElement('canvas');
-  //   canvas.width = 800;
-  //   canvas.height = 400;
+  const classifyImage = React.useCallback(
+    async () => {
+      const apiKey = 'acc_3ee403f503f6081';
+      const apiSecret = 'f09e03460411dbe4b9585f69181285f9';
 
-  //   const ctx = canvas.getContext('2d');
-  //   if (!ctx) {
-  //     return;
-  //   }
+      const url = 'https://api.imagga.com/v2/tags'
 
-  //   let image = new Image()
-  //   image.crossOrigin = "anonymous"
-  //   image.src = 'http://172.20.10.12/mjpeg/1'
-  //   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const data = new FormData();
+      data.append("image_base64", cameraSnapshotEl.current.src);
+      data.append('username', apiKey);
+      data.append('password', apiSecret);
 
-  //   const dataUrl = canvas.toDataURL()
-  //   console.log(dataUrl)
-  // }, []);
+      await fetch(
+        url,
+        {
+          method: "POST",
+          body: data,
+        }
+      )
+        .then((res) => console.log(res))
+        .catch((err) => console.log(err));
+
+      // axios.post(url, { 'image_base64': cameraSnapshotEl.current.src, 'username': apiKey, 'password': apiSecret }, {
+      //     headers: {
+      //       'Content-Type': 'application/json',
+      //       'Accept': 'application/json',
+      //     }
+      //   })
+      //   .then((response) => {
+      //     console.log(response)
+      //   })
+      //   .catch((error) => {
+      //     console.error(error)
+      //   })
+      // },
+      
+    }, []
+  )
   
   if (!client.current) { return null }
   
   return (
     <div className="App">
       <header className="App-header">
-        <h1>ROVERTIME</h1>
+        <h1>RECONBOT</h1>
         {/* <div id="code"><pre>{ messages[0] }</pre></div> */}
         {
           // (() => {
@@ -220,18 +243,17 @@ function App() {
           // })()
         }
       </header>
-      {/* <SimpleKeyboard
-        onChange={(input) => { console.log('onChange', input) }}
-        onKeyPress={(button) => { console.log('onKeyPress', button) }}
-      /> */}
       {
-        <img 
-          alt="Camera Feed"
-          src="http://172.20.10.12/mjpeg/1"
-          width="800" 
-          height="600" 
-          ref={cameraPreviewEl}
-        />
+        <>
+          <h2>Live Feed</h2>
+          <img 
+            alt="Camera Feed"
+            src="http://localhost:3000/video"
+            width="400" 
+            height="300" 
+            ref={cameraPreviewEl}
+          />
+        </>
       }
       <div>
         <button   
@@ -240,6 +262,31 @@ function App() {
           }}
         >Take a photo</button>
       </div>
+      <div>
+        <h3>Image Classifier</h3>
+        { !cameraSnapshotEl.current && cameraSnapshotEl.current === null && <p>Take an image to classify!</p> } 
+        <img 
+          // style={ { display: cameraSnapshotEl.current ? 'inline' : 'none' } } 
+          ref={cameraSnapshotEl} 
+          alt="Last snapshot" 
+        />
+        <p>{ snapshotTime && `Image generated at ${ snapshotTime.toISOString() }` }</p>
+      </div>
+      <div>
+        <button   
+          onClick={() => {
+            classifyImage()
+          }}
+        >Submit image for classification</button>
+      </div>
+      <br />
+      <br />
+      <br />
+      <br />
+      {/* <SimpleKeyboard
+        onChange={(input) => { console.log('onChange', input) }}
+        onKeyPress={(button) => { console.log('onKeyPress', button) }}
+      /> */}
     </div>
   );
 }
