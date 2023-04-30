@@ -14,14 +14,10 @@ module.exports = {
       '/video': {
         'target': 'http://172.20.10.12:81',
         'changeOrigin': true,
-        // 'logLevel': "debug",
-        'secure': false,
-        'bypass': (req, res, options) => {
-          // console.debug("bypass");
+        "pathRewrite": {
+          "/video": ""
         },
-        'onProxyReq': (proxyReq, req, res) => {
-          console.debug(`Proxying request: ${req.originalUrl} => ${proxyReq.path}`);
-        }
+        'secure': false,
       }
     },
   }

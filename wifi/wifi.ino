@@ -1,17 +1,17 @@
 #include <ArduinoMqttClient.h>
 #include <ESP8266WiFi.h>
 #include <string>
-#include <chrono>
+// #include <chrono>
 #include <iomanip>
 #include <iostream>
-#include <NTPClient.h>
-#include <WiFiUdp.h>
+// #include <NTPClient.h>
+// #include <WiFiUdp.h>
 #include <ArduinoJson.h>
 
 WiFiClient wifiClient;
 MqttClient mqttClient(wifiClient);
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org");
+// WiFiUDP ntpUDP;
+// NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 // home
 // const char ssid[] = "tenementfunster";
@@ -21,7 +21,7 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 // hotspot
 const char ssid[] = "mp_iphone";
 const char pass[] = "bonjour!"; 
-const char broker[] = "172.20.10.5";
+const char broker[] = "172.20.10.6";
 
 int        port     = 1883;
 const char subscribe_topic[]  = "feeds/rover/ui";
@@ -30,16 +30,16 @@ const char feedback_topic[] = "feeds/rover/feedback";
 const char err_topic[] = "feeds/rover/error";
 const char debug_topic[] = "feeds/rover/debug";
 
-unsigned long getTime() {
-  timeClient.update();
-  unsigned long now = timeClient.getEpochTime();
-  return now;
-}
+// unsigned long getTime() {
+//   timeClient.update();
+//   unsigned long now = timeClient.getEpochTime();
+//   return now;
+// }
 
-unsigned long long timeSinceEpochMillisec() {
-  unsigned long currentTime = getTime();
-	return (currentTime * 1000LL);
-}
+// unsigned long long timeSinceEpochMillisec() {
+//   unsigned long currentTime = getTime();
+// 	return (currentTime * 1000LL);
+// }
 
 void setup() {
   // initialize serial and wait for port to open:
@@ -61,7 +61,7 @@ void setup() {
   Serial.println(WiFi.localIP());
   Serial.println();
 
-  timeClient.update();
+  // timeClient.update();
 
   // each client must have a unique client ID
   mqttClient.setId("rover");
@@ -111,31 +111,21 @@ void loop() {
       Serial.print((char)mqttClient.read());
     }
 
-    // if (error) {
-    //   Serial.print("deserializeJson() failed: ");
-    //   Serial.println(error.f_str());
-    //   return;
-    // }
-    // else {
-      // create response
-      DynamicJsonDocument res(512);
-      // res["payload"]["req"] = req.as<String>();
-      res["timestamp"] = timeSinceEpochMillisec();
+    DynamicJsonDocument res(512);
 
-      // do something with incoming serial data from Arduino
-      if (Serial.available()) {
-        String resData = Serial.readString();
-        // Serial.print("  Got serial data from Arduino ");
-        // Serial.println(resData);
-        res["payload"]["res"] = resData;
-        mqttClient.beginMessage(feedback_topic);
-        mqttClient.print(res.as<String>());
-        mqttClient.endMessage();
-      }
-      
-      mqttClient.beginMessage(debug_topic);
+    if (Serial.available()) {
+      String resData = Serial.readString();
+      Serial.print("  Got serial data from Arduino ");
+      Serial.println(resData);
+      res["payload"]["res"] = resData;
+      mqttClient.beginMessage(feedback_topic);
       mqttClient.print(res.as<String>());
       mqttClient.endMessage();
-    // }
+    }
+    
+    mqttClient.beginMessage(debug_topic);
+    mqttClient.print(res.as<String>());
+    mqttClient.endMessage();
+    
   }
 }

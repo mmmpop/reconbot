@@ -8,11 +8,13 @@
 #include "src/parsebytes.h"
 #include "time.h"
 #include <ESPmDNS.h>
-
+#include <ArduinoMqttClient.h>
+#include <string>
+#include <ArduinoJson.h>
 
 /* This sketch is a extension/expansion/reork of the 'official' ESP32 Camera example
  *  sketch from Expressif:
- *  https://github.com/espressif/arduino-esp32/tree/master/libraries/ESP32/examples/Camera/CameraWebServer
+ *  https://github.com/esprWiFiessif/arduino-esp32/tree/master/libraries/ESP32/examples/Camera/CameraWebServer
  *
  *  It is modified to allow control of Illumination LED Lamps's (present on some modules),
  *  greater feedback via a status LED, and the HTML contents are present in plain text
@@ -35,6 +37,20 @@
  * an accesspoint called "ESP32-CAM-CONNECT" (password: "InsecurePassword")
  *
  */
+
+WiFiClient wifiClient;
+MqttClient mqttClient(wifiClient);
+
+const char ssid[] = "mp_iphone";
+const char pass[] = "bonjour!"; 
+const char broker[] = "172.20.10.6";
+
+int        port     = 1883;
+const char subscribe_topic[]  = "feeds/rover/ui";
+const char status_topic[] = "feeds/rover/status";
+const char feedback_topic[] = "feeds/rover/feedback";
+const char err_topic[] = "feeds/rover/error";
+const char debug_topic[] = "feeds/rover/debug";
 
 // Primary config, or defaults.
 #if __has_include("myconfig.h")
@@ -629,7 +645,7 @@ void WifiSetup() {
 }
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(9600);
     Serial.setDebugOutput(true);
     Serial.println();
     Serial.println("====");
@@ -689,6 +705,40 @@ void setup() {
         WifiSetup();
         delay(1000);
     }
+
+    // each client must have a unique client ID
+    mqttClient.setId("rover");
+
+    // you can provide a username and password for authentication
+    mqttClient.setUsernamePassword("rover", "bonjour!");
+
+    Serial.print("  Attempting to connect to the MQTT broker ");
+    Serial.println(broker);
+
+    if (!mqttClient.connect(broker, port)) {
+      Serial.print("  MQTT connection failed! Error code = ");
+      Serial.println(mqttClient.connectError());
+
+      while (1);
+    }
+
+    Serial.println("  You are connected to the MQTT broker ");
+    Serial.println();
+
+    mqttClient.beginMessage(status_topic);
+    mqttClient.print("{ \"payload\": { \"message\": \"Connected to broker!\" } }");
+    mqttClient.endMessage();
+
+    Serial.print("  Subscribing to topic ");
+    Serial.println(subscribe_topic);
+    Serial.println();
+
+    // subscribe to a topic
+    mqttClient.subscribe(subscribe_topic, 1);
+
+    Serial.print("  Waiting for messages on topic ");
+    Serial.println(subscribe_topic);
+    Serial.println();
 
     // Set up OTA
     if (otaEnabled) {
@@ -800,10 +850,36 @@ void setup() {
 
 void loop() {
     /*
-     *  Just loop forever, reconnecting Wifi As necesscary in client mode
+     * Just loop forever, reconnecting Wifi As necesscary in client mode
      * The stream and URI handler processes initiated by the startCameraServer() call at the
      * end of setup() will handle the camera and UI processing from now on.
     */
+    int messageSize = mqttClient.parseMessage();
+    if (messageSize) {
+      char message[512]; 
+      DynamicJsonDocument req(512);
+
+      // get an MQTT message
+      while (mqttClient.available()) {
+        Serial.print((char)mqttClient.read());
+      }
+
+      DynamicJsonDocument res(512);
+
+      if (Serial.available()) {
+        String resData = Serial.readString();
+        Serial.print("  Got serial data from Arduino ");
+        Serial.println(resData);
+        res["payload"]["res"] = resData;
+        mqttClient.beginMessage(feedback_topic);
+        mqttClient.print(res.as<String>());
+        mqttClient.endMessage();
+      }
+      
+      mqttClient.beginMessage(debug_topic);
+      mqttClient.print(res.as<String>());
+      mqttClient.endMessage();
+    }
     if (accesspoint) {
         // Accespoint is permanently up, so just loop, servicing the captive portal as needed
         // Rather than loop forever, follow the watchdog, in case we later add auto re-scan.
@@ -819,18 +895,18 @@ void loop() {
         static bool warned = false;
         if (WiFi.status() == WL_CONNECTED) {
             // We are connected, wait a bit and re-check
-            if (warned) {
-                // Tell the user if we have just reconnected
-                Serial.println("WiFi reconnected");
-                warned = false;
-            }
-            // loop here for WIFI_WATCHDOG, turning debugData true/false depending on serial input..
-            unsigned long start = millis();
-            while (millis() - start < WIFI_WATCHDOG ) {
-                delay(100);
-                if (otaEnabled) ArduinoOTA.handle();
-                handleSerial();
-            }
+            // if (warned) {
+            //     // Tell the user if we have just reconnected
+            //     Serial.println("WiFi reconnected");
+            //     warned = false;
+            // }
+            // // loop here for WIFI_WATCHDOG, turning debugData true/false depending on serial input..
+            // unsigned long start = millis();
+            // while (millis() - start < WIFI_WATCHDOG ) {
+            //     delay(100);
+            //     if (otaEnabled) ArduinoOTA.handle();
+            //     handleSerial();
+            // }
         } else {
             // disconnected; attempt to reconnect
             if (!warned) {
