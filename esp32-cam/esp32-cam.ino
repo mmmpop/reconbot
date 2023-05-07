@@ -69,8 +69,8 @@ MqttClient mqttClient(wifiClient);
 
 // const char ssid[] = "mp_iphone";
 // const char pass[] = "bonjour!"; 
-// const char broker[] = "172.20.10.6"; 
-const char broker[] = "192.168.1.25";
+const char broker[] = "172.20.10.6"; 
+// const char broker[] = "192.168.1.25";
 
 int        port     = 1883;
 const char subscribe_topic[]  = "feeds/rover/ui";
@@ -108,7 +108,7 @@ void mjpegCB(void* pvParameters) {
   xSemaphoreGive( frameSync );
 
   // Creating a queue to track all connected clients
-  streamingClients = xQueueCreate( 10, sizeof(WiFiClient*) );
+  streamingClients = xQueueCreate( 2, sizeof(WiFiClient*) );
 
   //=== setup section  ==================
 
@@ -471,7 +471,7 @@ void setup()
     //    .frame_size     = FRAMESIZE_SVGA,
     //    .frame_size     = FRAMESIZE_VGA,
     .frame_size     = FRAMESIZE_SVGA,
-    .jpeg_quality   = 12,
+    .jpeg_quality   = 36,
     .fb_count       = 2
   };
 
@@ -487,7 +487,8 @@ void setup()
   }
 
   sensor_t* s = esp_camera_sensor_get();
-  s->set_vflip(s, true);
+  s->set_vflip(s, false);
+  s->set_hmirror(s, 0);
 
   //  Configure and connect to WiFi
   IPAddress ip;
@@ -556,29 +557,30 @@ void setup()
 void loop() {
   int messageSize = mqttClient.parseMessage();
   if (messageSize) {
-    char message[512]; 
-    DynamicJsonDocument req(512);
+    // char message[512]; 
+    // DynamicJsonDocument req(1024);
 
     // get an MQTT message
     while (mqttClient.available()) {
       Serial.print((char)mqttClient.read());
     }
 
-    DynamicJsonDocument res(512);
+    DynamicJsonDocument res(1024);
 
     if (Serial.available()) {
       String resData = Serial.readString();
       Serial.print("  Got serial data from Arduino ");
       Serial.println(resData);
-      res["payload"]["res"] = resData;
+      // res["payload"]["res"] = resData;
+      // res = resData;
       mqttClient.beginMessage(feedback_topic);
-      mqttClient.print(res.as<String>());
+      mqttClient.print(resData);
       mqttClient.endMessage();
     }
     
-    mqttClient.beginMessage(debug_topic);
-    mqttClient.print(res.as<String>());
-    mqttClient.endMessage();
+    // mqttClient.beginMessage(debug_topic);
+    // mqttClient.print(resData);
+    // mqttClient.endMessage();
   }
   vTaskDelay(100);
 }

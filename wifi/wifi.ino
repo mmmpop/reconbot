@@ -7,6 +7,10 @@
 // #include <NTPClient.h>
 // #include <WiFiUdp.h>
 #include <ArduinoJson.h>
+#include <DHT.h>
+
+#define DHTPIN 5
+#define DHTTYPE DHT11
 
 WiFiClient wifiClient;
 MqttClient mqttClient(wifiClient);
@@ -14,14 +18,14 @@ MqttClient mqttClient(wifiClient);
 // NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 // home
-// const char ssid[] = "tenementfunster";
-// const char pass[] = "P3nnyTh3Mutt!"; 
-// const char broker[] = "192.168.1.25";
+const char ssid[] = "tenementfunster";
+const char pass[] = "P3nnyTh3Mutt!"; 
+const char broker[] = "192.168.1.25";
 
 // hotspot
-const char ssid[] = "mp_iphone";
-const char pass[] = "bonjour!"; 
-const char broker[] = "172.20.10.6";
+// const char ssid[] = "mp_iphone";
+// const char pass[] = "bonjour!"; 
+// const char broker[] = "172.20.10.6";
 
 int        port     = 1883;
 const char subscribe_topic[]  = "feeds/rover/ui";
@@ -30,21 +34,21 @@ const char feedback_topic[] = "feeds/rover/feedback";
 const char err_topic[] = "feeds/rover/error";
 const char debug_topic[] = "feeds/rover/debug";
 
-// unsigned long getTime() {
-//   timeClient.update();
-//   unsigned long now = timeClient.getEpochTime();
-//   return now;
-// }
-
-// unsigned long long timeSinceEpochMillisec() {
-//   unsigned long currentTime = getTime();
-// 	return (currentTime * 1000LL);
-// }
+DHT dht(DHTPIN, DHTTYPE);
 
 void setup() {
+  dht.begin();
+
+  // if (!baro.begin()) {
+  //   Serial.println("Couldnt find sensor");
+  //   return;
+  // }
   // initialize serial and wait for port to open:
   Serial.begin(9600);
   delay(10);
+
+  while(!Serial);
+  Serial.println("Starting...");
 
   // attempt to connect to WiFi network:
   Serial.print("  Attempting to connect to WPA SSID ");
@@ -83,7 +87,7 @@ void setup() {
   Serial.println();
 
   mqttClient.beginMessage(status_topic);
-  mqttClient.print("{ \"payload\": { \"message\": \"Connected to broker!\" } }");
+  mqttClient.print("{ \"payload\": { \"message\": \"Sensor connected to broker!\" } }");
   mqttClient.endMessage();
 
   Serial.print("  Subscribing to topic ");
@@ -101,31 +105,65 @@ void setup() {
 // todo: set date/time at wifi invocation; parse JSON 
 void loop() {
 
-  int messageSize = mqttClient.parseMessage();
-  if (messageSize) {
-    char message[512]; 
-    DynamicJsonDocument req(512);
+  // int messageSize = mqttClient.parseMessage();
+  // if (messageSize) {
+  //   char message[512]; 
+  //   DynamicJsonDocument req(512);
 
-    // get an MQTT message
-    while (mqttClient.available()) {
-      Serial.print((char)mqttClient.read());
-    }
+  //   // get an MQTT message
+  //   while (mqttClient.available()) {
+  //     Serial.print((char)mqttClient.read());
+  //   }
+
+  delay(2000);
+
+  // Reading temperature or humidity takes about 250 milliseconds!
+  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+  float h = dht.readHumidity();
+  // Read temperature as Celsius (the default)
+  // float t = dht.readTemperature();
+  // Read temperature as Fahrenheit (isFahrenheit = true)
+  // float f = dht.readTemperature(true);
+
+  // Check if any reads failed and exit early (to try again).
+  // if (isnan(h) || isnan(t) || isnan(f)) {
+    Serial.print(h);
+    Serial.println(F("Failed to read from DHT sensor!"));
+    return;
+  // }
+
+  // Compute heat index in Fahrenheit (the default)
+  // float hif = dht.computeHeatIndex(f, h);
+  // Compute heat index in Celsius (isFahreheit = false)
+  // float hic = dht.computeHeatIndex(t, h, false);
+
+  // Serial.print(F("Humidity: "));
+  // Serial.print(h);
+  // Serial.print(F("%  Temperature: "));
+  // Serial.print(t);
+  // Serial.print(F("°C "));
+  // Serial.print(f);
+  // Serial.print(F("°F  Heat index: "));
+  // Serial.print(hic);
+  // Serial.print(F("°C "));
+  // Serial.print(hif);
+  // Serial.println(F("°F"));
 
     DynamicJsonDocument res(512);
 
     if (Serial.available()) {
       String resData = Serial.readString();
-      Serial.print("  Got serial data from Arduino ");
-      Serial.println(resData);
-      res["payload"]["res"] = resData;
+      Serial.print("Got serial data from sensor");
+      
+      // res["payload"]["res"] = resData;
       mqttClient.beginMessage(feedback_topic);
       mqttClient.print(res.as<String>());
       mqttClient.endMessage();
     }
     
-    mqttClient.beginMessage(debug_topic);
-    mqttClient.print(res.as<String>());
-    mqttClient.endMessage();
+    // mqttClient.beginMessage(debug_topic);
+    // mqttClient.print(res.as<String>());
+    // mqttClient.endMessage();
     
-  }
+  // }
 }
